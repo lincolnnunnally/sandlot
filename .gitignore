@@ -5,11 +5,12 @@
 *.tsbuildinfo
 next-env.d.ts
 
-# env — never commit secrets
+# env — never commit secrets (allow .env.example)
 .env
 .env.local
 .env*.local
-.env*
+.env.production
+.env.development
 
 .DS_Store
 *.pem
