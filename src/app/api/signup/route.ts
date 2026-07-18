@@ -10,6 +10,8 @@
 // Shared-GoTrue rule: "email already registered" is NORMAL — a sibling app
 // already has this person. We report { exists: true } and the client offers
 // sign-in with the existing password (identity adoption — never reset it).
+//
+// Rate limit: swaparound_signup_rate_check (hashed email/IP, 5/email and 20/IP per hour).
 
 export async function POST(request: Request) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -41,6 +43,43 @@ export async function POST(request: Request) {
   }
   if (password.length < 8 || password.length > 200) {
     return Response.json({ error: "Please choose a password of at least 8 characters." }, { status: 400 });
+  }
+
+  // Best-effort client IP (Vercel / proxies). Hashed server-side — never stored raw.
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "";
+
+  // Rate limit before creating any auth user.
+  try {
+    const rateRes = await fetch(`${url}/rest/v1/rpc/swaparound_signup_rate_check`, {
+      method: "POST",
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({ p_email: email, p_ip: ip }),
+    });
+    if (rateRes.ok) {
+      const rate = (await rateRes.json().catch(() => null)) as { ok?: boolean; reason?: string } | null;
+      if (rate && rate.ok === false) {
+        return Response.json(
+          {
+            error:
+              rate.reason === "rate_limited"
+                ? "Too many sign-up attempts. Please wait and try again later."
+                : "Please use a real email address.",
+          },
+          { status: 429 }
+        );
+      }
+    }
+    // If RPC missing (migration not applied yet), continue — better than blocking all signups.
+  } catch {
+    // Network blip on rate check — fail open only for availability; logs in host metrics.
   }
 
   const response = await fetch(`${url}/auth/v1/admin/users`, {

@@ -920,7 +920,8 @@ export function listingPhotoUrls(l: { photo_url?: string | null; photo_urls?: st
   return l.photo_url ? [l.photo_url] : [];
 }
 
-/** Upload a compressed toy photo to the swaparound-toys bucket. Path: {uid}/{uuid}.jpg */
+/** Upload a compressed toy photo to the private swaparound-toys bucket. Path: {uid}/{uuid}.jpg
+ *  Bucket is private (0007) — use signed URLs for display, never permanent public URLs. */
 export async function uploadToyPhoto(uid: string, file: Blob, ext = "jpg"): Promise<{ path: string; url: string }> {
   const id = (typeof crypto !== "undefined" && "randomUUID" in crypto)
     ? crypto.randomUUID()
@@ -932,8 +933,33 @@ export async function uploadToyPhoto(uid: string, file: Blob, ext = "jpg"): Prom
     cacheControl: "3600",
   });
   if (error) throw new Error(error.message || "Couldn't upload the photo.");
-  const { data } = db().storage.from("swaparound-toys").getPublicUrl(path);
-  return { path, url: data.publicUrl };
+  const signed = await signedToyPhotoUrl(path);
+  return { path, url: signed || path };
+}
+
+/** Signed URL for a private toy photo path (1 hour). Returns null if path empty. */
+export async function signedToyPhotoUrl(path: string | null | undefined, expiresSec = 3600): Promise<string | null> {
+  if (!path || !path.trim()) return null;
+  // Already a full URL (legacy public objects before 0007) — use as-is.
+  if (/^https?:\/\//i.test(path)) return path;
+  const { data, error } = await db().storage.from("swaparound-toys").createSignedUrl(path, expiresSec);
+  if (error || !data?.signedUrl) return null;
+  return data.signedUrl;
+}
+
+/** Resolve display URLs for a listing: prefer photo_path → signed URL; fall back to photo_urls / photo_url. */
+export async function resolveListingPhotoUrls(l: {
+  photo_path?: string | null;
+  photo_url?: string | null;
+  photo_urls?: string[] | null;
+  photo_status?: string | null;
+}): Promise<string[]> {
+  if (l.photo_status && l.photo_status !== "ok" && l.photo_status !== "under_review") return [];
+  if (l.photo_path) {
+    const signed = await signedToyPhotoUrl(l.photo_path);
+    if (signed) return [signed];
+  }
+  return listingPhotoUrls(l);
 }
 
 /* ==================== MARKETPLACE · SEARCH · TRADES ==================== */
