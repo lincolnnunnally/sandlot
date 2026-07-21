@@ -518,7 +518,7 @@ DO $$
 BEGIN
   PERFORM extensions.digest('test', 'sha256');
 EXCEPTION
-  WHEN undefined_function OR undefined_schema THEN
+  WHEN undefined_function OR others THEN
     CREATE OR REPLACE FUNCTION public.swaparound_signup_rate_check(
       p_email text,
       p_ip text DEFAULT ''
