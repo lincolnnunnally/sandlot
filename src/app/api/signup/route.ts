@@ -45,11 +45,15 @@ export async function POST(request: Request) {
     return Response.json({ error: "Please choose a password of at least 8 characters." }, { status: 400 });
   }
 
-  // Best-effort client IP (Vercel / proxies). Hashed server-side — never stored raw.
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "";
+  // Best-effort client IP for the secondary IP rate-limit bucket. Hashed
+  // server-side — never stored raw. On Vercel `x-real-ip` is set by the platform
+  // to the true peer IP and is NOT client-spoofable, so we trust it first. We
+  // only fall back to `x-forwarded-for`, and then to its LAST hop (appended by
+  // the trusted proxy) rather than the client-controlled leftmost value — taking
+  // the leftmost let an attacker rotate a spoofed IP to dodge the per-IP limit.
+  // Still best-effort; the per-email limit is the primary abuse control.
+  const xffLast = (request.headers.get("x-forwarded-for") || "").split(",").pop() || "";
+  const ip = (request.headers.get("x-real-ip") || xffLast || "").trim();
 
   // Rate limit before creating any auth user.
   try {
