@@ -962,6 +962,40 @@ export async function resolveListingPhotoUrls(l: {
   return listingPhotoUrls(l);
 }
 
+/**
+ * Re-sign a listing's photos for display against the now-private swaparound-toys bucket.
+ * The photo_url / photo_urls stored on the row are short-lived signed URLs (or legacy
+ * public URLs from before 0007 flipped the bucket private) and go stale, so the cover is
+ * re-signed fresh from photo_path on every load. Extra gallery URLs are preserved
+ * best-effort (per-photo paths aren't persisted yet — see follow-up).
+ */
+export async function hydrateListingPhotos<T extends {
+  photo_path?: string | null;
+  photo_url?: string | null;
+  photo_urls?: string[] | null;
+  photo_status?: string | null;
+}>(l: T): Promise<T> {
+  if (l.photo_status && l.photo_status !== "ok" && l.photo_status !== "under_review") {
+    return { ...l, photo_url: null, photo_urls: [] };
+  }
+  const cover = l.photo_path
+    ? await signedToyPhotoUrl(l.photo_path)
+    : (listingPhotoUrls(l)[0] ?? null);
+  const extras = (Array.isArray(l.photo_urls) ? l.photo_urls.filter(Boolean) : [])
+    .filter((u) => u !== l.photo_url && u !== cover);
+  const gallery = cover ? [cover, ...extras] : extras;
+  return { ...l, photo_url: cover, photo_urls: gallery };
+}
+
+async function hydrateListingList<T extends {
+  photo_path?: string | null;
+  photo_url?: string | null;
+  photo_urls?: string[] | null;
+  photo_status?: string | null;
+}>(rows: T[]): Promise<T[]> {
+  return Promise.all(rows.map((r) => hydrateListingPhotos(r)));
+}
+
 /* ==================== MARKETPLACE · SEARCH · TRADES ==================== */
 
 function rpcErr(error: { message?: string }, fallback: string): Error {
@@ -1002,7 +1036,7 @@ export async function marketBrowse(opts?: {
       p_child: opts?.childId || null,
     });
     if (error) throw rpcErr(error, "Couldn't load toys.");
-    return (data as MarketListing[]) || [];
+    return hydrateListingList((data as MarketListing[]) || []);
   }
   const { data, error } = await db().rpc("swaparound_market_browse", {
     p_q: opts?.q?.trim() || null,
@@ -1012,7 +1046,7 @@ export async function marketBrowse(opts?: {
     p_toy_type: opts?.toyType?.trim() || null,
   });
   if (error) throw rpcErr(error, "Couldn't load the marketplace.");
-  return (data as MarketListing[]) || [];
+  return hydrateListingList((data as MarketListing[]) || []);
 }
 
 export async function toggleFavorite(childId: string, listingId: string): Promise<"added" | "removed"> {
@@ -1027,7 +1061,7 @@ export async function toggleFavorite(childId: string, listingId: string): Promis
 export async function childFavorites(childId: string): Promise<MarketListing[]> {
   const { data, error } = await db().rpc("swaparound_child_favorites", { p_child: childId });
   if (error) throw rpcErr(error, "Couldn't load favorites.");
-  return (data as MarketListing[]) || [];
+  return hydrateListingList((data as MarketListing[]) || []);
 }
 
 export async function childFavoriteIds(childId: string): Promise<string[]> {
@@ -1166,7 +1200,7 @@ export async function adminSafetyQueue(): Promise<SafetyQueueItem[]> {
 export async function myListings(): Promise<MyListing[]> {
   const { data, error } = await db().rpc("swaparound_my_listings");
   if (error) throw rpcErr(error, "Couldn't load your listings.");
-  return (data as MyListing[]) || [];
+  return hydrateListingList((data as MyListing[]) || []);
 }
 
 export async function myTrades(): Promise<TradeRow[]> {
