@@ -252,3 +252,62 @@ textarea { resize: vertical; min-height: 64px; }
 .legal .callout { background: var(--sunshine-soft); color: var(--sunshine-ink); border-radius: 12px; padding: 12px 14px; }
 .legal .backrow { display: flex; justify-content: space-between; gap: 12px; margin-top: 34px;
   border-top: 1px solid var(--line); padding-top: 16px; font-size: .85rem; }
+
+/* =================================================================
+   RESPONSIVE — the app is mobile-first; these layers make it feel at
+   home on tablet and desktop instead of a narrow phone strip.
+   ================================================================= */
+
+/* Tablet / large phone: give the column a little more room. */
+@media (min-width: 640px) {
+  .shell { max-width: 560px; }
+  .pad { padding: 20px; }
+}
+
+/* Desktop: the parent portal's bottom tab bar becomes a left sidebar,
+   and the content sits in a comfortable centered column beside it. */
+@media (min-width: 1024px) {
+  .shell { max-width: 720px; }
+  .pad { padding: 24px 28px; }
+
+  /* Reserve space for the fixed sidebar ONLY on pages that have it
+     (auth, admin, legal, /m, /join stay as a normal centered column). */
+  body:has(.parent-nav) { padding-left: 236px; }
+  .shell.has-parent-nav { max-width: 780px; margin: 0 auto; padding-bottom: 40px; }
+
+  .parent-nav {
+    left: 0; top: 0; bottom: 0; transform: none;
+    width: 236px; height: 100vh;
+    grid-template-columns: 1fr; grid-auto-rows: max-content; align-content: start;
+    gap: 3px; padding: 22px 14px calc(22px + env(safe-area-inset-bottom, 0px));
+    border-top: none; border-right: 1px solid var(--line); box-shadow: none;
+    background: color-mix(in srgb, var(--paper) 96%, transparent);
+  }
+  .parent-nav::before {
+    content: "🛝 Sandlot"; display: block; font-family: var(--fd); font-weight: 800;
+    font-size: 1.05rem; color: var(--ink); padding: 2px 12px 16px;
+  }
+  .parent-nav button {
+    flex-direction: row; justify-content: flex-start; gap: 12px;
+    padding: 11px 14px; font-size: .95rem; letter-spacing: 0;
+  }
+  .parent-nav button .nav-ico { font-size: 1.25rem; }
+  .parent-nav .nav-badge { position: static; margin-left: auto; }
+
+  /* main app's own top bar: brand now lives in the sidebar */
+  body:has(.parent-nav) .bar .brand { display: none; }
+  body:has(.parent-nav) .bar { justify-content: flex-end; }
+
+  .toast { bottom: 24px; }
+
+  /* spread content into the extra width */
+  .home-actions { grid-template-columns: repeat(4, 1fr); }
+  .kids-grid { grid-template-columns: repeat(3, 1fr); }
+  .orch-modes { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* Wide desktop: a touch wider + denser toy grids. */
+@media (min-width: 1440px) {
+  .shell.has-parent-nav { max-width: 900px; }
+  .kids-grid { grid-template-columns: repeat(4, 1fr); }
+}
