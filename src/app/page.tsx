@@ -322,6 +322,7 @@ function Dashboard({ uid, parent, onFlash }: { uid: string; parent: Parent; onFl
   const [view, setView] = useState<"parent" | "kids">("parent");
   const [nav, setNav] = useState<ParentNav>("home");
   const [swapsTab, setSwapsTab] = useState<"browse" | "mine" | "trades">("trades");
+  const [chosenPlace, setChosenPlace] = useState<{ id: string; name: string; neighborhood: string | null } | null>(null);
   const bumpFamilies = useCallback(() => setFamilyTick((t) => t + 1), []);
 
   const bandLabel = useCallback((code: string) => bands.find((b) => b.code === code)?.label || code, [bands]);
@@ -484,12 +485,15 @@ function Dashboard({ uid, parent, onFlash }: { uid: string; parent: Parent; onFl
               defaultArea={parent.area_label}
               onCreated={refresh}
               onFlash={onFlash}
+              preselectVenue={chosenPlace}
+              onPreselectConsumed={() => setChosenPlace(null)}
             />
             <VenueMapCard
               uid={uid}
               defaultZip={parent.zip}
               defaultArea={parent.area_label}
               onFlash={onFlash}
+              onPlaceChosen={(v) => setChosenPlace(v)}
             />
 
             <div className="eyebrow">All playdates</div>
@@ -1122,6 +1126,18 @@ function SessionCard({ session, children, rsvp, bandLabel, isAdmin: admin, invit
   const hostIsSomeoneElse = !!session.host_id && session.host_id !== uid;
   const canCheckIn = session.host_id === uid || admin;
   const communityVenue = venue?.status === "community";
+  const swapsToys = !!session.swaps_toys;
+
+  async function shareSession() {
+    const url = `${typeof window !== "undefined" ? window.location.origin : ""}/m/${session.id}`;
+    const nav = typeof navigator !== "undefined" ? navigator : undefined;
+    const data = { title: "Sandlot playdate", text: `Join us: ${session.theme || session.title}`, url };
+    try {
+      if (nav?.share) { await nav.share(data); return; }
+      await nav?.clipboard?.writeText(url);
+      onFlash("Link copied! 📋");
+    } catch { /* dismissed */ }
+  }
 
   return (
     <div className="card" style={{ marginBottom: 10 }}>
@@ -1142,6 +1158,7 @@ function SessionCard({ session, children, rsvp, bandLabel, isAdmin: admin, invit
                 : null}
         </div>
       )}
+      {swapsToys && <div className="tiny" style={{ color: "var(--clover-deep)", marginBottom: 2 }}>🤝 Toy swap playdate</div>}
       <div className="small muted">{venue?.name}{venue?.neighborhood ? ` · ${venue.neighborhood}` : ""}</div>
       {communityVenue && <div className="note note-sun small" style={{ marginTop: 8 }}>ℹ️ Community-added place — <b>not yet verified</b> by Sandlot. Parents stay on-site here (no drop-off). Meet in the open and use ⚐ report if anything feels off.</div>}
       <div className="chips" style={{ marginTop: 8 }}>
@@ -1165,10 +1182,15 @@ function SessionCard({ session, children, rsvp, bandLabel, isAdmin: admin, invit
       {canCheckIn && <CheckinPanel sessionId={session.id} onFlash={onFlash} />}
 
       {!open ? (
-        <div className="grid2" style={{ marginTop: 12 }}>
-          <button className="btn btn-primary" onClick={() => setOpen(true)}>{rsvp ? "Edit RSVP" : "RSVP"}</button>
-          <button className="btn btn-ghost" disabled={!rsvp} onClick={() => setBoard((v) => !v)}>{board ? "Hide swaps" : "Swap board"}</button>
-        </div>
+        <>
+          <div className="grid2" style={{ marginTop: 12 }}>
+            <button className="btn btn-primary" onClick={() => setOpen(true)}>{rsvp ? "Edit RSVP" : "RSVP"}</button>
+            <button className="btn btn-ghost" onClick={shareSession}>🔗 Share / invite</button>
+          </div>
+          {swapsToys && (
+            <button className="btn btn-ghost btn-block" style={{ marginTop: 8 }} disabled={!rsvp} onClick={() => setBoard((v) => !v)}>{board ? "Hide swap board" : rsvp ? "🤝 Toy swap board" : "🤝 RSVP to see the swap board"}</button>
+          )}
+        </>
       ) : (
         <div style={{ marginTop: 12 }}>
           <div className="field"><label>Who are you bringing?</label>

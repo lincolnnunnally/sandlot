@@ -30,12 +30,16 @@ type Props = {
   defaultArea?: string | null;
   onCreated: () => void;
   onFlash: (m: string) => void;
+  /** A place chosen on the map — opens the host form with it preselected. */
+  preselectVenue?: { id: string; name: string; neighborhood: string | null } | null;
+  onPreselectConsumed?: () => void;
 };
 
 /** Parent-facing meetup orchestrator: event / playground / group / one-on-one. */
-export function ParentOrchestrator({ uid, defaultZip, defaultArea, onCreated, onFlash }: Props) {
+export function ParentOrchestrator({ uid, defaultZip, defaultArea, onCreated, onFlash, preselectVenue, onPreselectConsumed }: Props) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<MeetupMode>("event");
+  const [posted, setPosted] = useState<{ id: string; title: string } | null>(null);
   const [bands, setBands] = useState<AgeBand[]>([]);
   const [venues, setVenues] = useState<HostVenue[]>([]);
   const [allVenues, setAllVenues] = useState<AdminVenue[]>([]);
@@ -55,6 +59,7 @@ export function ParentOrchestrator({ uid, defaultZip, defaultArea, onCreated, on
     bands: [] as string[],
     groupIds: [] as string[],
     inviteNote: "",
+    swaps_toys: false,
   });
   const [req, setReq] = useState({
     venueId: "",
@@ -89,6 +94,33 @@ export function ParentOrchestrator({ uid, defaultZip, defaultArea, onCreated, on
 
   useEffect(() => { if (open) load(); }, [open, load]);
 
+  // A place chosen on the map → open the host form with it selected.
+  useEffect(() => {
+    if (!preselectVenue) return;
+    setPosted(null);
+    setOpen(true);
+    setPanel("host");
+    setVenues((cur) => cur.some((v) => v.id === preselectVenue.id)
+      ? cur
+      : [...cur, { id: preselectVenue.id, name: preselectVenue.name, neighborhood: preselectVenue.neighborhood, status: "community" }]);
+    setF((cur) => ({ ...cur, venue_id: preselectVenue.id }));
+    onFlash(`${preselectVenue.name} selected — now pick a day & time, then post.`);
+    onPreselectConsumed?.();
+    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch { /* */ }
+  }, [preselectVenue, onFlash, onPreselectConsumed]);
+
+  const shareUrl = posted ? `${typeof window !== "undefined" ? window.location.origin : ""}/m/${posted.id}` : "";
+  async function shareLink() {
+    const nav = typeof navigator !== "undefined" ? navigator : undefined;
+    const data = { title: "Sandlot playdate", text: `Join us: ${posted?.title}`, url: shareUrl };
+    try {
+      if (nav?.share) { await nav.share(data); return; }
+      await nav?.clipboard?.writeText(shareUrl);
+      onFlash("Link copied! 📋");
+    } catch { /* dismissed */ }
+  }
+  async function copyLink() { try { await navigator.clipboard.writeText(shareUrl); onFlash("Link copied! 📋"); } catch { /* */ } }
+
   async function host(e: React.FormEvent) {
     e.preventDefault();
     setErr(""); setBusy(true);
@@ -109,7 +141,7 @@ export function ParentOrchestrator({ uid, defaultZip, defaultArea, onCreated, on
             : mode === "group" ? "Circle meetup"
               : "Sandlot playdate");
 
-      await hostCreateSession(uid, {
+      const newId = await hostCreateSession(uid, {
         venue_id: f.venue_id,
         theme,
         starts_at: starts.toISOString(),
@@ -119,6 +151,7 @@ export function ParentOrchestrator({ uid, defaultZip, defaultArea, onCreated, on
         cost_note: f.cost,
         groupIds: mode === "group" ? f.groupIds : undefined,
         meetupMode: mode,
+        swapsToys: f.swaps_toys,
       });
       onFlash(
         mode === "one_on_one" ? "One-on-one playdate posted! 🤝"
@@ -126,7 +159,7 @@ export function ParentOrchestrator({ uid, defaultZip, defaultArea, onCreated, on
             : mode === "group" ? "Circle meetup posted! 💚"
               : "Event meetup is live! 🏟️"
       );
-      setOpen(false);
+      setPosted({ id: newId, title: theme }); // show the share step (don't close)
       onCreated();
     } catch (ex) {
       setErr(ex instanceof Error ? ex.message : "Couldn't create meetup.");
@@ -168,12 +201,28 @@ export function ParentOrchestrator({ uid, defaultZip, defaultArea, onCreated, on
         </button>
       ) : (
         <div className="card">
+          {posted && (
+            <div>
+              <div className="note note-clover" style={{ marginBottom: 12 }}>🎉 <b>{posted.title}</b> is live! Share it so families can RSVP &amp; join.</div>
+              <div className="field"><label>Shareable link</label>
+                <input readOnly value={shareUrl} onFocus={(e) => e.currentTarget.select()} style={{ fontFamily: "var(--fm)", fontSize: ".8rem" }} /></div>
+              <div className="grid2">
+                <button type="button" className="btn btn-ghost" onClick={copyLink}>Copy link</button>
+                <button type="button" className="btn btn-primary" onClick={shareLink}>Share…</button>
+              </div>
+              <p className="tiny muted" style={{ margin: "10px 0 0" }}>Anyone with the link can see it and open Sandlot to RSVP. It also shows up for nearby families in the meetups list.</p>
+              <button type="button" className="btn btn-ghost btn-block" style={{ marginTop: 10 }} onClick={() => { setPosted(null); setOpen(false); }}>Done</button>
+            </div>
+          )}
+
+          {!posted && (
           <div className="seg" style={{ marginBottom: 12 }}>
             <button type="button" className={panel === "host" ? "on" : ""} onClick={() => setPanel("host")}>I&apos;ll host</button>
             <button type="button" className={panel === "request" ? "on" : ""} onClick={() => setPanel("request")} style={{ gridColumn: "span 2" }}>Ask a venue for a day</button>
           </div>
+          )}
 
-          {panel === "host" && (
+          {!posted && panel === "host" && (
             <form onSubmit={host}>
               <p className="small muted" style={{ margin: "0 0 10px" }}>
                 Pick how you want to meet — facility event, park, your circle, or just one other family.
@@ -269,6 +318,11 @@ export function ParentOrchestrator({ uid, defaultZip, defaultArea, onCreated, on
                 </div>
               )}
 
+              <label className="note note-clover small" style={{ display: "flex", gap: 8, alignItems: "center", cursor: "pointer", margin: "0 0 12px" }}>
+                <input type="checkbox" checked={f.swaps_toys} onChange={(e) => setF({ ...f, swaps_toys: e.target.checked })} style={{ width: 18, height: 18, flex: "0 0 auto" }} />
+                <span>🤝 Kids will <b>swap or trade toys</b> at this playdate (adds a swap board to the event).</span>
+              </label>
+
               <div className="field"><label>Cost note</label>
                 <input value={f.cost} onChange={(e) => setF({ ...f, cost: e.target.value })} placeholder="Free" /></div>
 
@@ -280,7 +334,7 @@ export function ParentOrchestrator({ uid, defaultZip, defaultArea, onCreated, on
             </form>
           )}
 
-          {panel === "request" && (
+          {!posted && panel === "request" && (
             <form onSubmit={requestDay}>
               <p className="small muted" style={{ margin: "0 0 10px" }}>
                 Ask a venue to host a Sandlot day. They approve on their calendar; then you (or they) can finalize the meetup.

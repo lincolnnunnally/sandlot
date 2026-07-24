@@ -58,6 +58,7 @@ export type SessionRow = {
   cost_note: string | null;
   status: string;
   meetup_mode?: MeetupMode | string;
+  swaps_toys?: boolean;
   swaparound_venues?: {
     name: string;
     neighborhood: string | null;
@@ -286,13 +287,13 @@ export async function addFacility(uid: string, v: { name: string; venue_type: st
 
 export async function hostCreateSession(uid: string, s: {
   venue_id: string; theme: string; starts_at: string; ends_at: string; target_bands: string[]; capacity_kids: number; cost_note: string; groupIds?: string[];
-  meetupMode?: MeetupMode;
-}): Promise<void> {
+  meetupMode?: MeetupMode; swapsToys?: boolean;
+}): Promise<string> {
   const { data, error } = await db().from("swaparound_sessions").insert({
     venue_id: s.venue_id, host_id: uid, title: s.theme || "Meetup", theme: s.theme || null,
     target_bands: s.target_bands, starts_at: s.starts_at, ends_at: s.ends_at,
     capacity_kids: s.capacity_kids, cost_note: s.cost_note || null, status: "published",
-    meetup_mode: s.meetupMode || "event",
+    meetup_mode: s.meetupMode || "event", swaps_toys: !!s.swapsToys,
   }).select("id").single();
   if (error) {
     if (/meetup_rate_limit/.test(error.message || "")) throw new Error("You've posted several meetups today — please try again tomorrow.");
@@ -305,6 +306,20 @@ export async function hostCreateSession(uid: string, s: {
     const { error: gErr } = await db().from("swaparound_session_groups").insert(rows);
     if (gErr) throw gErr;
   }
+  return sessionId;
+}
+
+// Public, safe details for a shareable /m/[id] event link (no address/kid names).
+export type PublicSession = {
+  id: string; title: string; starts_at: string; ends_at: string; mode: string | null;
+  swaps_toys: boolean; cost: string | null; bands: string[]; venue: string | null;
+  area: string | null; venue_status: string | null; families: number; kids: number;
+} | null;
+
+export async function publicSession(id: string): Promise<PublicSession> {
+  const { data, error } = await db().rpc("swaparound_public_session", { p_session: id });
+  if (error) throw error;
+  return (data as PublicSession) || null;
 }
 
 export type RsvpInfo = {
@@ -842,11 +857,12 @@ export async function adminFetchSessions(): Promise<AdminSession[]> {
   if (error) throw error; return (data || []) as AdminSession[];
 }
 export async function adminCreateSession(s: {
-  venue_id: string; title: string; theme: string; target_bands: string[]; starts_at: string; ends_at: string; capacity_kids: number; cost_note: string; status: string;
+  venue_id: string; title: string; theme: string; target_bands: string[]; starts_at: string; ends_at: string; capacity_kids: number; cost_note: string; status: string; swapsToys?: boolean;
 }): Promise<void> {
   const { error } = await db().from("swaparound_sessions").insert({
     venue_id: s.venue_id, title: s.title, theme: s.theme || null, target_bands: s.target_bands,
     starts_at: s.starts_at, ends_at: s.ends_at, capacity_kids: s.capacity_kids, cost_note: s.cost_note || null, status: s.status,
+    swaps_toys: !!s.swapsToys,
   });
   if (error) throw error;
 }
