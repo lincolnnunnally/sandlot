@@ -13,6 +13,9 @@ import {
   proposeTrade,
   reportListingPhoto,
   respondTrade,
+  tradeThread,
+  postTradeMessage,
+  setTradeMeetup,
   uploadToyPhoto,
   withdrawListing,
   PHOTO_REPORT_REASONS,
@@ -28,6 +31,7 @@ import {
   type Parent,
   type SessionRow,
   type TradeRow,
+  type TradeMessage,
 } from "@/lib/db";
 import { compressToyPhoto, validateToyImageFile } from "@/lib/photos";
 
@@ -869,15 +873,48 @@ function TradeCard({
   onChanged: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [thread, setThread] = useState<TradeMessage[]>([]);
+  const [loadingThread, setLoadingThread] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [linking, setLinking] = useState(false);
+  const [pickSession, setPickSession] = useState("");
+
   const session = trade.playdate_session_id
     ? sessions.find((s) => s.id === trade.playdate_session_id)
     : null;
+  const active = trade.status === "pending" || trade.status === "accepted";
+  const upcoming = sessions.filter((s) => new Date(s.starts_at).getTime() > Date.now() - 2 * 3600_000);
 
   async function act(fn: () => Promise<unknown>, ok: string) {
     setBusy(true);
     try { await fn(); onFlash(ok); await onChanged(); }
     catch (e) { onFlash(e instanceof Error ? e.message : "Something went wrong."); }
     finally { setBusy(false); }
+  }
+
+  const loadThread = useCallback(async () => {
+    setLoadingThread(true);
+    try { setThread(await tradeThread(trade.id)); }
+    catch (e) { onFlash(e instanceof Error ? e.message : "Couldn't load the conversation."); }
+    finally { setLoadingThread(false); }
+  }, [trade.id, onFlash]);
+
+  async function toggleChat() {
+    const opening = !showChat;
+    setShowChat(opening);
+    if (opening) await loadThread();
+  }
+  async function send() {
+    if (!msg.trim()) return;
+    setBusy(true);
+    try { await postTradeMessage(trade.id, msg.trim()); setMsg(""); await loadThread(); }
+    catch (e) { onFlash(e instanceof Error ? e.message : "Couldn't send that message."); }
+    finally { setBusy(false); }
+  }
+  async function linkMeetup(sessionId: string | null) {
+    await act(() => setTradeMeetup(trade.id, sessionId), sessionId ? "Meetup set for this swap 🤝" : "Meetup unlinked.");
+    setLinking(false); setPickSession("");
   }
 
   return (
@@ -899,11 +936,57 @@ function TradeCard({
           : `You offered your toy to ${trade.to_name}.`}
         {trade.message ? ` “${trade.message}”` : ""}
       </p>
-      {session && (
+
+      {/* The meetup this swap will happen at */}
+      {session ? (
         <div className="note note-clover small" style={{ marginBottom: 8 }}>
-          Suggested meet-up: <b>{session.theme || session.title}</b> · {new Date(session.starts_at).toLocaleString()}
+          🤝 Swapping at <b>{session.theme || session.title}</b> · {new Date(session.starts_at).toLocaleString()}
+          {active && <> · <button className="linkish" onClick={() => linkMeetup(null)} disabled={busy}>change</button></>}
         </div>
-      )}
+      ) : active ? (
+        !linking ? (
+          <button className="linkish" style={{ marginBottom: 8, display: "block" }} onClick={() => setLinking(true)}>📅 Set the meetup for this swap</button>
+        ) : (
+          <div className="field" style={{ marginBottom: 8 }}>
+            <label>Which meetup will you swap at?</label>
+            <select value={pickSession} onChange={(e) => setPickSession(e.target.value)}>
+              <option value="">Pick an upcoming meetup…</option>
+              {upcoming.map((s) => <option key={s.id} value={s.id}>{(s.theme || s.title)} · {new Date(s.starts_at).toLocaleDateString()}</option>)}
+            </select>
+            {upcoming.length === 0 && <p className="tiny muted" style={{ margin: "6px 0 0" }}>No upcoming meetups yet — plan one in the Meetups tab, then set it here.</p>}
+            <div className="grid2" style={{ marginTop: 6 }}>
+              <button className="btn btn-ghost" style={{ padding: "7px 10px", fontSize: ".8rem" }} onClick={() => { setLinking(false); setPickSession(""); }}>Cancel</button>
+              <button className="btn btn-primary" style={{ padding: "7px 10px", fontSize: ".8rem" }} disabled={busy || !pickSession} onClick={() => linkMeetup(pickSession)}>Set meetup</button>
+            </div>
+          </div>
+        )
+      ) : null}
+
+      {/* Talk about the swap beforehand */}
+      <div style={{ marginBottom: 8 }}>
+        <button className="linkish" onClick={toggleChat}>{showChat ? "Hide conversation" : "💬 Talk about this swap"}</button>
+        {showChat && (
+          <div className="card" style={{ marginTop: 6 }}>
+            {loadingThread ? <p className="tiny muted" style={{ margin: 0 }}>Loading…</p>
+              : thread.length === 0 ? <p className="tiny muted" style={{ margin: 0 }}>No messages yet — say hi and plan the swap.</p>
+              : thread.map((m) => (
+                <div key={m.id} style={{ textAlign: m.mine ? "right" : "left", marginBottom: 6 }}>
+                  <div style={{ display: "inline-block", maxWidth: "85%", padding: "6px 10px", borderRadius: 10, background: m.mine ? "var(--clover-soft)" : "var(--sky-soft)", textAlign: "left" }}>
+                    <div className="tiny muted" style={{ marginBottom: 1 }}>{m.mine ? "You" : m.name}</div>
+                    <div className="small" style={{ whiteSpace: "pre-wrap" }}>{m.body}</div>
+                  </div>
+                </div>
+              ))}
+            <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+              <input value={msg} onChange={(e) => setMsg(e.target.value)} placeholder="Message about the swap…" maxLength={1000} style={{ flex: 1 }}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); send(); } }} />
+              <button className="btn btn-primary" style={{ padding: "8px 12px", fontSize: ".82rem" }} disabled={busy || !msg.trim()} onClick={send}>Send</button>
+            </div>
+            <p className="tiny muted" style={{ margin: "8px 0 0" }}>Parents only — keep it kind. A real person reviews reports.</p>
+          </div>
+        )}
+      </div>
+
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         {trade.direction === "incoming" && trade.status === "pending" && (
           <>

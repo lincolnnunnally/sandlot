@@ -1262,6 +1262,26 @@ export async function cancelTrade(offerId: string): Promise<string> {
   return data as string;
 }
 
+// ---- talk about a swap beforehand + tie it to a meetup ----
+export type TradeMessage = { id: string; body: string; created_at: string; name: string; mine: boolean };
+
+export async function tradeThread(offerId: string): Promise<TradeMessage[]> {
+  const { data, error } = await db().rpc("swaparound_trade_thread", { p_offer: offerId });
+  if (error) throw rpcErr(error, "Couldn't load the conversation.");
+  return (data as TradeMessage[]) || [];
+}
+
+export async function postTradeMessage(offerId: string, body: string): Promise<void> {
+  const { error } = await db().rpc("swaparound_trade_post_message", { p_offer: offerId, p_body: body });
+  if (error) throw rpcErr(error, "Couldn't send that message.");
+}
+
+// Link a meetup to a trade (or pass null to unlink). Marks the meetup a toy-swap.
+export async function setTradeMeetup(offerId: string, sessionId: string | null): Promise<void> {
+  const { error } = await db().rpc("swaparound_set_trade_meetup", { p_offer: offerId, p_session: sessionId });
+  if (error) throw rpcErr(error, "Couldn't link that meetup.");
+}
+
 export async function withdrawListing(listingId: string): Promise<string> {
   const { data, error } = await db().rpc("swaparound_withdraw_listing", { p_listing: listingId });
   if (error) throw rpcErr(error, "Couldn't withdraw that listing.");
