@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { Telemetry } from '../lib/TelemetryProvider';
 
 export const metadata: Metadata = {
   title: "Sandlot — fidget trading, toys & playdates",
@@ -16,7 +17,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <Telemetry app="sandlot" />
+      </body>
     </html>
   );
 }
