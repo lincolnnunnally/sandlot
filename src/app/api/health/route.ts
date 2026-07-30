@@ -1,9 +1,24 @@
-// Lightweight liveness probe for uptime monitoring and deploy verification.
-// Dependency-free and unauthenticated: returns 200 with a timestamp so external
-// checkers can confirm the app is serving requests.
+// Liveness + honest ops readiness for Sandlot (password-reset mailer, DB).
+// Never leaks secrets — only booleans for whether required keys are present.
 
-export const runtime = 'nodejs';
+export const runtime = "nodejs";
 
 export async function GET() {
-  return Response.json({ ok: true, ts: new Date().toISOString() }, { status: 200 });
+  const emailConfigured = Boolean(process.env.RESEND_API_KEY?.trim());
+  const supabaseConfigured = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() &&
+      process.env.SUPABASE_SERVICE_ROLE_KEY?.trim(),
+  );
+  const ok = emailConfigured && supabaseConfigured;
+  return Response.json(
+    {
+      ok,
+      app: "Sandlot",
+      ts: new Date().toISOString(),
+      emailConfigured,
+      supabaseConfigured,
+      resetPath: "/api/reset/request",
+    },
+    { status: ok ? 200 : 503 },
+  );
 }
