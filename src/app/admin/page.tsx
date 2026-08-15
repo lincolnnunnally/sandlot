@@ -55,6 +55,7 @@ function Wrap({ children, onSignOut }: { children: React.ReactNode; onSignOut?: 
       <div className="bar">
         <div className="brand"><div className="mark">🛝</div><b>Sandlot <span style={{ fontFamily: "var(--fm)", fontSize: ".62rem", letterSpacing: ".12em", color: "var(--ink-soft)" }}>OWNER</span></b></div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <a className="btn btn-ghost" style={{ padding: "8px 12px", fontSize: ".82rem", textDecoration: "none" }} href="https://appengine.unitedundergod.org" target="_blank" rel="noreferrer">App Engine</a>
           <a className="btn btn-primary" style={{ padding: "8px 12px", fontSize: ".82rem", textDecoration: "none" }} href="/">Family app</a>
           {onSignOut && <button className="btn btn-ghost" style={{ padding: "8px 12px", fontSize: ".82rem" }} onClick={onSignOut}>Sign out</button>}
         </div>
