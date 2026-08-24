@@ -69,27 +69,32 @@ export function ParentOrchestrator({ uid, defaultZip, defaultArea, onCreated, on
   });
 
   const load = useCallback(async () => {
-    const [b, v, c, fam, map] = await Promise.all([
-      fetchAgeBands(),
-      fetchHostVenues(),
-      myCircles().catch(() => [] as Circle[]),
-      myFamilies().catch(() => [] as FamilyLink[]),
-      venuesMap().catch(() => [] as AdminVenue[]),
-    ]);
-    setBands(b);
-    setVenues(v);
-    setCircles(c);
-    setFamilies(fam.filter((x) => x.status === "active"));
-    setAllVenues(map.filter((x) => x.status === "verified"));
-    setF((cur) => ({
-      ...cur,
-      venue_id: cur.venue_id || v[0]?.id || map.find((x) => x.status === "verified")?.id || "",
-      bands: cur.bands.length ? cur.bands : b.slice(0, 2).map((x) => x.code),
-    }));
-    setReq((cur) => ({
-      ...cur,
-      venueId: cur.venueId || map.find((x) => x.status === "verified")?.id || "",
-    }));
+    setErr("");
+    try {
+      const [b, v, c, fam, map] = await Promise.all([
+        fetchAgeBands(),
+        fetchHostVenues(),
+        myCircles(),
+        myFamilies(),
+        venuesMap(),
+      ]);
+      setBands(b);
+      setVenues(v);
+      setCircles(c);
+      setFamilies(fam.filter((x) => x.status === "active"));
+      setAllVenues(map.filter((x) => x.status === "verified"));
+      setF((cur) => ({
+        ...cur,
+        venue_id: cur.venue_id || v[0]?.id || map.find((x) => x.status === "verified")?.id || "",
+        bands: cur.bands.length ? cur.bands : b.slice(0, 2).map((x) => x.code),
+      }));
+      setReq((cur) => ({
+        ...cur,
+        venueId: cur.venueId || map.find((x) => x.status === "verified")?.id || "",
+      }));
+    } catch (ex) {
+      setErr(ex instanceof Error ? ex.message : "Couldn't load meetup options.");
+    }
   }, []);
 
   useEffect(() => { if (open) load(); }, [open, load]);

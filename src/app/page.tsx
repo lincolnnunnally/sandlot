@@ -3,17 +3,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { getSupabase } from "@/lib/supabase";
 import {
-  addChild, addListing, blockParent, fetchAgeBands, fetchBlocks, fetchChildren, fetchHostVenues,
-  fetchListings, fetchMyRsvp, fetchParent, fetchSessions, hostCreateSession, onboardParent, saveRsvp,
-  submitReport, unblockParent, isAdmin, updateChildInterests, addFacility,
+  addChild, addListing, blockParent, fetchAgeBands, fetchBlocks, fetchChildren,
+  fetchListings, fetchMyRsvp, fetchParent, fetchSessions, onboardParent, saveRsvp,
+  submitReport, unblockParent, isAdmin, updateChildInterests,
   ensureMyCode, redeemCode, sessionCounts, sessionAttendees, sessionRoster,
   requestConnection, acceptConnection, dismissConnection, myFamilies, checkinTicket,
   myCircles, createCircle, addToCircle, removeFromCircle, deleteCircle, myInvitedSessionIds,
   myTrades,
-  KID_AVATARS, REPORT_REASONS, TOY_CATEGORIES, TOY_CONDITIONS, TOY_EMOJI, VENUE_TYPES,
+  KID_AVATARS, REPORT_REASONS, TOY_CATEGORIES, TOY_CONDITIONS, TOY_EMOJI,
   type AgeBand, type Block, type Child, type Listing, type Parent, type ReportTargetType,
   type RsvpInfo, type SessionRow, type SessionCounts, type Attendee, type RosterFamily, type FamilyLink,
-  type CheckinResult, type Circle, type HostVenue, type TradeRow,
+  type CheckinResult, type Circle, type TradeRow,
 } from "@/lib/db";
 import { MarketplaceSection } from "@/components/Marketplace";
 import { GrowSandlotCard } from "@/components/Growth";
@@ -37,6 +37,8 @@ export default function Home() {
   const [uid, setUid] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [parent, setParent] = useState<Parent | null>(null);
+  const [parentLoaded, setParentLoaded] = useState(false);
+  const [parentError, setParentError] = useState("");
   const [admin, setAdmin] = useState(false);
   const [toast, setToast] = useState("");
 
@@ -52,16 +54,25 @@ export default function Home() {
     const { data: sub } = supa.auth.onAuthStateChange((_e, session) => {
       setUid(session?.user.id ?? null);
       setEmail(session?.user.email ?? null);
-      if (!session) setParent(null);
+      if (!session) { setParent(null); setParentLoaded(false); setParentError(""); }
     });
     return () => sub.subscription.unsubscribe();
   }, [supa]);
 
+  const loadParent = useCallback((id: string) => {
+    setParentLoaded(false);
+    setParentError("");
+    fetchParent(id)
+      .then((p) => { setParent(p); setParentError(""); })
+      .catch(() => setParentError("Couldn't load your family profile. Check your connection and try again."))
+      .finally(() => setParentLoaded(true));
+    isAdmin(id).then(setAdmin).catch(() => setAdmin(false));
+  }, []);
+
   useEffect(() => {
-    if (!uid) { setAdmin(false); return; }
-    fetchParent(uid).then(setParent).catch(() => {});
-    isAdmin(uid).then(setAdmin).catch(() => setAdmin(false));
-  }, [uid]);
+    if (!uid) { setAdmin(false); setParentLoaded(false); setParentError(""); return; }
+    loadParent(uid);
+  }, [uid, loadParent]);
 
   if (!supa) return <Shell><div className="pad"><p className="muted">Sandlot isn&apos;t connected to its database yet.</p></div></Shell>;
   if (!ready) return <Shell><div className="pad muted">Loading…</div></Shell>;
@@ -77,6 +88,15 @@ export default function Home() {
       )}
       {!uid ? (
         <AuthScreen onFlash={flash} />
+      ) : !parentLoaded ? (
+        <div className="pad muted">Loading…</div>
+      ) : parentError && !parent ? (
+        <div className="pad">
+          <div className="card">
+            <p className="note note-sun" style={{ marginTop: 0 }}>{parentError}</p>
+            <button className="btn btn-primary btn-block" onClick={() => loadParent(uid)}>Try again</button>
+          </div>
+        </div>
       ) : !parent ? (
         <Onboarding uid={uid} email={email} onDone={(p) => setParent(p)} onFlash={flash} />
       ) : (
@@ -318,6 +338,7 @@ function Dashboard({ uid, parent, onFlash }: { uid: string; parent: Parent; onFl
   const [admin, setAdmin] = useState(false);
   const [invited, setInvited] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [familyTick, setFamilyTick] = useState(0);
   const [view, setView] = useState<"parent" | "kids">("parent");
   const [nav, setNav] = useState<ParentNav>("home");
@@ -334,17 +355,20 @@ function Dashboard({ uid, parent, onFlash }: { uid: string; parent: Parent; onFl
 
   const refresh = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
     try {
       const [b, c, s, adm, inv, t] = await Promise.all([
         fetchAgeBands(),
         fetchChildren(uid),
         fetchSessions(),
         isAdmin(uid),
-        myInvitedSessionIds().catch(() => [] as string[]),
-        myTrades().catch(() => [] as TradeRow[]),
+        myInvitedSessionIds(),
+        myTrades(),
       ]);
       setBands(b); setChildren(c); setSessions(s); setAdmin(adm); setInvited(new Set(inv)); setTrades(t);
       await loadRsvps(s);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Couldn't load your meetups.");
     } finally { setLoading(false); }
   }, [uid, loadRsvps]);
 
@@ -432,6 +456,11 @@ function Dashboard({ uid, parent, onFlash }: { uid: string; parent: Parent; onFl
             <div className="eyebrow first" style={{ marginTop: 8 }}>Upcoming meetups</div>
             {loading ? (
               <p className="muted small">Loading meetups…</p>
+            ) : loadError ? (
+              <div className="card">
+                <p className="note note-sun" style={{ margin: "0 0 10px" }}>{loadError}</p>
+                <button type="button" className="btn btn-primary btn-block" onClick={() => refresh()}>Try again</button>
+              </div>
             ) : upcoming.length === 0 ? (
               <div className="card">
                 <p className="small" style={{ margin: "0 0 10px" }}>
@@ -499,6 +528,11 @@ function Dashboard({ uid, parent, onFlash }: { uid: string; parent: Parent; onFl
             <div className="eyebrow">All playdates</div>
             {loading ? (
               <p className="muted small">Loading…</p>
+            ) : loadError ? (
+              <div className="card">
+                <p className="note note-sun" style={{ margin: "0 0 10px" }}>{loadError}</p>
+                <button type="button" className="btn btn-primary btn-block" onClick={() => refresh()}>Try again</button>
+              </div>
             ) : sessions.length === 0 ? (
               <div className="card">
                 <p className="muted small" style={{ margin: 0 }}>
@@ -685,7 +719,9 @@ function FamiliesSection({ uid, onFlash, refreshKey, onChanged }: {
   const [redeemVal, setRedeemVal] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(() => { myFamilies().then(setFamilies).catch(() => {}); }, []);
+  const load = useCallback(() => {
+    myFamilies().then(setFamilies).catch(() => onFlash("Couldn't load your connected families."));
+  }, [onFlash]);
   useEffect(() => { load(); }, [load, refreshKey]);
 
   const connected = families.filter((f) => f.status === "active");
@@ -898,9 +934,11 @@ function CirclesSection({ uid, onFlash, refreshKey }: { uid: string; onFlash: (m
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const [c, f] = await Promise.all([myCircles().catch(() => []), myFamilies().catch(() => [])]);
-    setCircles(c); setFamilies(f.filter((x) => x.status === "active"));
-  }, []);
+    try {
+      const [c, f] = await Promise.all([myCircles(), myFamilies()]);
+      setCircles(c); setFamilies(f.filter((x) => x.status === "active"));
+    } catch { onFlash("Couldn't load your circles."); }
+  }, [onFlash]);
   useEffect(() => { if (open) load(); }, [open, load, refreshKey]);
 
   async function act(fn: () => Promise<unknown>, msg: string) {
@@ -968,140 +1006,6 @@ function CirclesSection({ uid, onFlash, refreshKey }: { uid: string; onFlash: (m
         </div>
       )}
     </>
-  );
-}
-
-function HostSection({ uid, bands, onCreated, onFlash }: { uid: string; bands: AgeBand[]; onCreated: () => Promise<void>; onFlash: (m: string) => void }) {
-  const [open, setOpen] = useState(false);
-  const [venues, setVenues] = useState<HostVenue[]>([]);
-  const [circles, setCircles] = useState<Circle[]>([]);
-  const [f, setF] = useState({ venue_id: "", theme: "", starts: "", hours: 3, capacity: 20, cost: "", bands: [] as string[], groupIds: [] as string[] });
-  const [addingVenue, setAddingVenue] = useState(false);
-  const [commit, setCommit] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-
-  async function openForm() {
-    setOpen(true);
-    try {
-      const [v, c] = await Promise.all([fetchHostVenues(), myCircles()]);
-      setVenues(v); setCircles(c);
-      setF((cur) => ({ ...cur, venue_id: cur.venue_id || v[0]?.id || "" }));
-    } catch {}
-  }
-
-  function venueLabel(v: HostVenue) {
-    return `${v.name}${v.neighborhood ? ` · ${v.neighborhood}` : ""}${v.status === "community" ? " (community-added)" : ""}`;
-  }
-
-  async function onVenueAdded(v: HostVenue) {
-    setVenues((cur) => [...cur, v]);
-    setF((cur) => ({ ...cur, venue_id: v.id }));
-    setAddingVenue(false);
-    onFlash("Place added — you can host here now. 📍");
-  }
-
-  async function save(e: React.FormEvent) {
-    e.preventDefault(); setErr("");
-    if (!f.venue_id) { setErr("Pick a place, or add one below."); return; }
-    if (!f.starts) { setErr("Pick a date & time."); return; }
-    if (!f.bands.length) { setErr("Pick at least one age group."); return; }
-    if (!commit) { setErr("Please agree to the host promise below."); return; }
-    setBusy(true);
-    try {
-      const starts = new Date(f.starts);
-      const ends = new Date(starts.getTime() + f.hours * 3600 * 1000);
-      await hostCreateSession(uid, {
-        venue_id: f.venue_id, theme: f.theme.trim(), starts_at: starts.toISOString(), ends_at: ends.toISOString(),
-        target_bands: f.bands, capacity_kids: f.capacity, cost_note: f.cost.trim(), groupIds: f.groupIds,
-      });
-      setF({ venue_id: f.venue_id, theme: "", starts: "", hours: 3, capacity: 20, cost: "", bands: [], groupIds: [] });
-      setCommit(false); setOpen(false); await onCreated(); onFlash("Your playdate is live! 🎉");
-    } catch (e2) { setErr(e2 instanceof Error ? e2.message : "Couldn't create the playdate."); }
-    finally { setBusy(false); }
-  }
-
-  return (
-    <>
-      <div className="eyebrow">Host a playdate / swap</div>
-      {!open ? (
-        <button className="btn btn-ghost btn-block" onClick={openForm}>+ Host a playdate or toy swap</button>
-      ) : (
-        <form className="card" onSubmit={save}>
-          <p className="tiny muted" style={{ margin: "0 0 12px" }}>Pick a place and a time for a playdate and fidget/toy swap — families can RSVP. You&apos;re the grown-up in charge.</p>
-          <div className="field"><label>Where</label>
-            {venues.length ? <select value={f.venue_id} onChange={(e) => setF({ ...f, venue_id: e.target.value })}>{venues.map((v) => <option key={v.id} value={v.id}>{venueLabel(v)}</option>)}</select>
-              : <p className="tiny muted" style={{ margin: 0 }}>No places yet — add one below.</p>}
-            {!addingVenue
-              ? <button type="button" className="linkish" style={{ marginTop: 6 }} onClick={() => setAddingVenue(true)}>+ Add a new place</button>
-              : <AddFacility uid={uid} onAdded={onVenueAdded} onCancel={() => setAddingVenue(false)} />}
-          </div>
-          <div className="field"><label>What&apos;s it called?</label><input value={f.theme} onChange={(e) => setF({ ...f, theme: e.target.value })} placeholder="e.g. Fidget Swap & Playdate" maxLength={40} required /></div>
-          <div className="field"><label>Date &amp; start time</label><input type="datetime-local" value={f.starts} onChange={(e) => setF({ ...f, starts: e.target.value })} /></div>
-          <div className="grid2">
-            <div className="field"><label>Hours long</label><input type="number" min={1} max={8} value={f.hours} onChange={(e) => setF({ ...f, hours: parseInt(e.target.value, 10) || 3 })} /></div>
-            <div className="field"><label>Kid capacity</label><input type="number" min={1} max={200} value={f.capacity} onChange={(e) => setF({ ...f, capacity: parseInt(e.target.value, 10) || 20 })} /></div>
-          </div>
-          <div className="field"><label>Age groups it&apos;s for</label>
-            <div className="chips">{bands.map((b) => { const on = f.bands.includes(b.code); return <button type="button" key={b.code} className={`chip ${on ? "on" : ""}`} onClick={() => setF({ ...f, bands: on ? f.bands.filter((x) => x !== b.code) : [...f.bands, b.code] })}>{b.label}</button>; })}</div></div>
-          {circles.length > 0 && (
-            <div className="field"><label>Invite your circles (optional)</label>
-              <p className="tiny muted" style={{ margin: "0 0 8px" }}>Families in these circles will see it highlighted as invited.</p>
-              <div className="chips">{circles.map((c) => { const on = f.groupIds.includes(c.id); return <button type="button" key={c.id} className={`chip ${on ? "on" : ""}`} onClick={() => setF({ ...f, groupIds: on ? f.groupIds.filter((x) => x !== c.id) : [...f.groupIds, c.id] })}>💚 {c.name}</button>; })}</div></div>
-          )}
-          <div className="field"><label>Cost note (optional)</label><input value={f.cost} onChange={(e) => setF({ ...f, cost: e.target.value })} placeholder="Free" maxLength={60} /></div>
-          <label className="note note-clover" style={{ alignItems: "center", cursor: "pointer", marginBottom: 12 }}>
-            <input type="checkbox" checked={commit} onChange={(e) => setCommit(e.target.checked)} style={{ width: 18, height: 18 }} />
-            <span>I&apos;ll be there to supervise, keep it to 1 grown-up per 6 kids, and follow the safety rules.</span>
-          </label>
-          {err && <p className="note note-sun" style={{ marginBottom: 12 }}>{err}</p>}
-          <div className="grid2"><button type="button" className="btn btn-ghost" onClick={() => { setOpen(false); setErr(""); }}>Cancel</button><button className="btn btn-primary" disabled={busy}>{busy ? "…" : "Post my playdate"}</button></div>
-        </form>
-      )}
-    </>
-  );
-}
-
-// Parents add a public, supervised facility. Safety floor: an explicit
-// attestation that it's a public, non-home space; it's saved as 'community'
-// (labeled, reportable, admin-pausable) — never as an admin-'verified' place.
-function AddFacility({ uid, onAdded, onCancel }: { uid: string; onAdded: (v: HostVenue) => void; onCancel: () => void }) {
-  const [v, setV] = useState({ name: "", venue_type: VENUE_TYPES[0].code, neighborhood: "", address: "", perk: "" });
-  const [attest, setAttest] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-
-  async function add() {
-    setErr("");
-    if (!v.name.trim()) { setErr("Give the place a name."); return; }
-    if (v.address.trim().length < 6) { setErr("Please add the full address of this public place."); return; }
-    if (!attest) { setErr("Please confirm this is a public, supervised space — not a home."); return; }
-    setBusy(true);
-    try { onAdded(await addFacility(uid, v)); }
-    catch (e) { setErr(e instanceof Error ? e.message : "Couldn't add that place."); }
-    finally { setBusy(false); }
-  }
-
-  return (
-    <div className="card" style={{ marginTop: 8, borderColor: "var(--sky)" }}>
-      <b className="small">Add a place</b>
-      <p className="tiny muted" style={{ margin: "4px 0 10px" }}>A public, supervised space open to the community — a church hall, rec center, library, park pavilion, gym. Never a private home. Until the owner verifies it, your meetup here is labeled &ldquo;not verified&rdquo; and families stay on-site (no drop-off).</p>
-      <div className="field"><label>Name</label><input value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} placeholder="e.g. Grace Church Fellowship Hall" maxLength={60} /></div>
-      <div className="field"><label>Type</label>
-        <select value={v.venue_type} onChange={(e) => setV({ ...v, venue_type: e.target.value })}>{VENUE_TYPES.map((t) => <option key={t.code} value={t.code}>{t.label}</option>)}</select></div>
-      <div className="field"><label>Full address</label><input value={v.address} onChange={(e) => setV({ ...v, address: e.target.value })} placeholder="e.g. 123 Main St, Cumming GA 30040" maxLength={140} />
-        <p className="tiny muted" style={{ margin: "6px 0 0" }}>Shared with the owner for review and with families who RSVP — so everyone knows it&apos;s a real public place.</p></div>
-      <div className="field"><label>Area / neighborhood</label><input value={v.neighborhood} onChange={(e) => setV({ ...v, neighborhood: e.target.value })} placeholder="e.g. Eastside · Cumming" maxLength={60} /></div>
-      <label className="note note-clover" style={{ alignItems: "flex-start", cursor: "pointer", marginBottom: 12 }}>
-        <input type="checkbox" checked={attest} onChange={(e) => setAttest(e.target.checked)} style={{ width: 18, height: 18, marginTop: 1, flex: "0 0 auto" }} />
-        <span>This is a <b>public, supervised space</b> open to the community — not a private home. I understand meetups here are visible to families, address-listed, and reviewed by Sandlot.</span>
-      </label>
-      {err && <p className="note note-sun" style={{ marginBottom: 10 }}>{err}</p>}
-      <div className="grid2">
-        <button type="button" className="btn btn-ghost" onClick={onCancel}>Cancel</button>
-        <button type="button" className="btn btn-primary" disabled={busy} onClick={add}>{busy ? "Adding…" : "Add place"}</button>
-      </div>
-    </div>
   );
 }
 

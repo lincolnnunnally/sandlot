@@ -13,10 +13,18 @@ export default function MeetupPage() {
 
   const [data, setData] = useState<PublicSession | undefined>(undefined);
   const [bands, setBands] = useState<AgeBand[]>([]);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
+    setLoadError("");
+    setData(undefined);
     fetchAgeBands().then(setBands).catch(() => {});
-    publicSession(id).then((d) => setData(d ?? null)).catch(() => setData(null));
+    publicSession(id)
+      .then((d) => setData(d ?? null))
+      .catch(() => {
+        setData(null);
+        setLoadError("Couldn't load this playdate. Check your connection and try again.");
+      });
   }, [id]);
 
   const bandLabel = (code: string) => bands.find((b) => b.code === code)?.label || code;
@@ -30,6 +38,13 @@ export default function MeetupPage() {
       <div className="pad">
         {data === undefined ? (
           <p className="muted small">Loading…</p>
+        ) : data === null && loadError ? (
+          <div className="card">
+            <h2 style={{ fontSize: "1.15rem", margin: "0 0 6px" }}>Couldn&apos;t load this playdate</h2>
+            <p className="small muted" style={{ margin: "0 0 14px" }}>{loadError}</p>
+            <button className="btn btn-primary btn-block" onClick={() => window.location.reload()}>Try again</button>
+            <button className="btn btn-ghost btn-block" style={{ marginTop: 8 }} onClick={() => router.push("/")}>Open Sandlot</button>
+          </div>
         ) : data === null ? (
           <div className="card">
             <h2 style={{ fontSize: "1.15rem", margin: "0 0 6px" }}>This playdate isn&apos;t available</h2>
