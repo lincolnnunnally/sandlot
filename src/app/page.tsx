@@ -149,14 +149,17 @@ function AuthScreen({ onFlash }: { onFlash: (m: string) => void }) {
     e.preventDefault();
     setErr(""); setBusy(true);
     try {
-      await fetch("/api/reset/request", {
+      const res = await fetch("/api/reset/request", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      // Always succeeds from the user's view — no account enumeration.
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload.message || "We could not send a reset email right now.");
+      }
       setResetSent(true);
-    } catch {
-      setResetSent(true);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "We could not send a reset email right now.");
     } finally {
       setBusy(false);
     }

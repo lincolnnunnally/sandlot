@@ -1,21 +1,23 @@
 // Step 1 of self-serve password reset: the user asks for a link.
-//
-// Privacy: this ALWAYS responds { ok: true } — whether or not the email has an
-// account — so it can't be used to discover who's registered. The DB function
-// silently no-ops for unknown emails and throttles to one token per 60s.
-//
-// The raw token is generated here, emailed as the only copy, and stored only as
-// a sha256 hash. Service key stays on the server.
+// Unknown emails still get { ok: true } so this cannot be used to discover
+// who's registered. Mailer failure is different: that is 503, not a fake send.
 
 import crypto from "crypto";
-import { after } from "next/server";
 import { sendEmail, passwordResetEmail } from "@/lib/email";
+
+const UNAVAILABLE = {
+  error: "reset_unavailable",
+  message:
+    "We couldn't send a reset email right now. Please try again in a few minutes, or ask for help from the address on your account.",
+};
 
 export async function POST(request: Request) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const ok = () => Response.json({ ok: true });
-  if (!url || !serviceKey) return ok();
+  if (!url || !serviceKey || !process.env.RESEND_API_KEY?.trim()) {
+    return Response.json(UNAVAILABLE, { status: 503 });
+  }
 
   let body: Record<string, unknown>;
   try {
@@ -44,23 +46,19 @@ export async function POST(request: Request) {
     });
     if (res.ok) issued = (await res.json().catch(() => null)) as Issued | null;
   } catch {
-    /* swallow — never reveal anything to the caller */
+    return Response.json(UNAVAILABLE, { status: 503 });
   }
 
   if (issued && issued.user_id) {
     const base = (process.env.APP_BASE_URL || new URL(request.url).origin).replace(/\/+$/, "");
     const link = `${base}/reset?token=${rawToken}`;
     const mail = passwordResetEmail(link);
-    // Send AFTER the response is flushed. This keeps response time identical for
-    // registered vs unregistered emails (no timing side-channel / enumeration),
-    // and lets us log delivery failures instead of silently swallowing them.
-    after(async () => {
-      try {
-        await sendEmail({ to: email, subject: mail.subject, html: mail.html, text: mail.text });
-      } catch (e) {
-        console.error("[reset] email send failed:", e instanceof Error ? e.message : e);
-      }
-    });
+    try {
+      await sendEmail({ to: email, subject: mail.subject, html: mail.html, text: mail.text });
+    } catch (e) {
+      console.error("[reset] email send failed:", e instanceof Error ? e.message : e);
+      return Response.json(UNAVAILABLE, { status: 503 });
+    }
   }
 
   return ok();
