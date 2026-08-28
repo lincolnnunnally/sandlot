@@ -577,7 +577,21 @@ function LeadDetail({
         <p className="tiny muted" style={{ margin: "0 0 10px" }}>
           {lead.kind} · {STAGE_LABEL[lead.stage]} · {lead.priority} · {lead.source}
         </p>
-        <p className="small" style={{ margin: "0 0 6px" }}>{lead.contact_name || "No contact"} · {lead.email || "—"} · {lead.phone || "—"}</p>
+        <p className="small" style={{ margin: "0 0 6px" }}>
+          {lead.contact_name || "No contact"}
+          {lead.email ? (
+            <> · <a href={`mailto:${lead.email}`}>{lead.email}</a></>
+          ) : " · —"}
+          {lead.phone ? (
+            <>
+              {" · "}
+              <a href={`tel:${lead.phone}`}>{lead.phone}</a>
+              {String(lead.phone).replace(/[^\d+]/g, "") && (
+                <> · <a href={`sms:${String(lead.phone).replace(/[^\d+]/g, "")}`}>Text</a></>
+              )}
+            </>
+          ) : " · —"}
+        </p>
         <p className="small muted" style={{ margin: "0 0 6px" }}>Area: {lead.area || "—"}</p>
         {lead.next_action && <div className="note note-sky small" style={{ marginBottom: 10 }}>Next: <b>{lead.next_action}</b>{lead.next_action_at ? ` by ${lead.next_action_at}` : ""}</div>}
         {lead.notes && <p className="small" style={{ whiteSpace: "pre-wrap", margin: "0 0 12px" }}>{lead.notes}</p>}
@@ -648,7 +662,19 @@ function TipsBoard({
             </div>
             {(t.contact_name || t.contact_email || t.contact_phone) && (
               <p className="small" style={{ margin: "8px 0 0" }}>
-                {t.contact_name || "Contact"} · {t.contact_email || "—"} · {t.contact_phone || "—"}
+                {t.contact_name || "Contact"}
+                {t.contact_email ? (
+                  <> · <a href={`mailto:${t.contact_email}`}>{t.contact_email}</a></>
+                ) : " · —"}
+                {t.contact_phone ? (
+                  <>
+                    {" · "}
+                    <a href={`tel:${t.contact_phone}`}>{t.contact_phone}</a>
+                    {String(t.contact_phone).replace(/[^\d+]/g, "") && (
+                      <> · <a href={`sms:${String(t.contact_phone).replace(/[^\d+]/g, "")}`}>Text</a></>
+                    )}
+                  </>
+                ) : " · —"}
               </p>
             )}
             {t.notes && <p className="small muted" style={{ margin: "6px 0 0" }}>{t.notes}</p>}
