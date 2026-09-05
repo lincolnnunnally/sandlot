@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 };
 
 type Props = {
-  searchParams: Promise<{ q?: string; ll?: string }> | { q?: string; ll?: string };
+  searchParams: Promise<{ q?: string; ll?: string }>;
 };
 
 function parsePin(ll: string | undefined): { lat: number; lon: number } | null {
