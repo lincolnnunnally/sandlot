@@ -49,7 +49,7 @@ function placeLine(p: MapPlace): string {
 }
 
 type Props = {
-  uid: string;
+  uid?: string;
   defaultZip?: string | null;
   defaultArea?: string | null;
   onFlash: (m: string) => void;
@@ -240,7 +240,7 @@ export function PlaceFinderMap({ uid, defaultZip, defaultArea, onFlash, onPlaceR
   const selectedIsSandlot = !!selected?.sandlotVenueId;
 
   async function useThisPlace() {
-    if (!selected) return;
+    if (!selected || !uid) return;
     setBusy(true);
     try {
       if (selected.sandlotVenueId) {
@@ -385,18 +385,26 @@ export function PlaceFinderMap({ uid, defaultZip, defaultArea, onFlash, onPlaceR
               🍎 Apple Maps
             </a>
           </div>
-          <button
-            type="button"
-            className="btn btn-primary btn-block"
-            style={{ marginTop: 8 }}
-            disabled={busy}
-            onClick={useThisPlace}
-          >
-            {busy ? "…" : "Meet here (no venue signup)"}
-          </button>
-          <p className="tiny muted" style={{ margin: "8px 0 0" }}>
-            Directions open in Maps. <b>Meet here</b> only saves this park so you can Plan a meetup time — it is not a business venue.
-          </p>
+          {uid ? (
+            <>
+              <button
+                type="button"
+                className="btn btn-primary btn-block"
+                style={{ marginTop: 8 }}
+                disabled={busy}
+                onClick={useThisPlace}
+              >
+                {busy ? "…" : "Meet here (no venue signup)"}
+              </button>
+              <p className="tiny muted" style={{ margin: "8px 0 0" }}>
+                Directions open in Maps. <b>Meet here</b> only saves this park so you can Plan a meetup time — it is not a business venue.
+              </p>
+            </>
+          ) : (
+            <p className="tiny muted" style={{ margin: "8px 0 0" }}>
+              Directions open in Maps. Sign in to save this park for a meetup.
+            </p>
+          )}
         </div>
       )}
 
