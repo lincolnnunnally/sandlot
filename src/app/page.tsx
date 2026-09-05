@@ -19,6 +19,7 @@ import { MarketplaceSection } from "@/components/Marketplace";
 import { GrowSandlotCard } from "@/components/Growth";
 import { KidsToysDashboard } from "@/components/KidsToys";
 import { ParentOrchestrator, VenueMapCard } from "@/components/ParentOrchestrator";
+import { PublicParkFinder } from "@/components/PublicParkFinder";
 
 type ParentNav = "home" | "meetups" | "swaps" | "family" | "more";
 
@@ -74,7 +75,24 @@ export default function Home() {
     loadParent(uid);
   }, [uid, loadParent]);
 
-  if (!supa) return <Shell><div className="pad"><p className="muted">Sandlot isn&apos;t connected to its database yet.</p></div></Shell>;
+  if (!supa) {
+    return (
+      <Shell>
+        <div className="pad">
+          <p className="note note-sun small" style={{ marginTop: 0 }}>
+            Family accounts need a database connection. Public parks below still load.
+          </p>
+          <div className="section-head">
+            <h2>Find a park</h2>
+            <p>Tap a park for Google Maps or Apple Maps.</p>
+          </div>
+          <div className="card">
+            <PublicParkFinder onFlash={flash} />
+          </div>
+        </div>
+      </Shell>
+    );
+  }
   if (!ready) return <Shell><div className="pad muted">Loading…</div></Shell>;
 
   const inPortal = !!(uid && parent);
@@ -116,6 +134,7 @@ function Shell({ children, signedIn, admin, onSignOut, parentNav }: {
         <div className="brand"><div className="mark">🛝</div><b>Sandlot</b></div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
           {admin && <a className="btn btn-primary" style={{ padding: "8px 10px", fontSize: ".78rem", textDecoration: "none" }} href="/admin">Owner</a>}
+          {!parentNav && !signedIn && <a className="btn btn-ghost" style={{ padding: "8px 10px", fontSize: ".78rem", textDecoration: "none" }} href="/maps">Parks</a>}
           {!parentNav && <a className="btn btn-ghost" style={{ padding: "8px 10px", fontSize: ".78rem", textDecoration: "none" }} href="/venue">Venue</a>}
           {signedIn && <button className="btn btn-ghost" style={{ padding: "8px 10px", fontSize: ".78rem" }} onClick={onSignOut}>Sign out</button>}
         </div>
@@ -258,6 +277,14 @@ function AuthScreen({ onFlash }: { onFlash: (m: string) => void }) {
             </p>
           </>
         )}
+      </div>
+
+      <div className="eyebrow first" style={{ marginTop: 16 }}>Find a park</div>
+      <div className="card">
+        <p className="small muted" style={{ margin: "0 0 10px" }}>
+          Public parks — tap a result for <b>Google Maps</b> or <b>Apple Maps</b>. No account needed for directions.
+        </p>
+        <PublicParkFinder onFlash={onFlash} />
       </div>
     </div>
   );
