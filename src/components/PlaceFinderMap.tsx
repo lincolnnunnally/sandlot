@@ -38,7 +38,7 @@ function navLinks(p: MapPlace) {
     zip: p.zip,
     displayAddress: p.displayAddress,
   });
-  return { maps: built.mapsUrl, apple: built.appleMapsUrl, label: built.queryLabel };
+  return { maps: built.mapsUrl, apple: built.appleMapsDoorUrl, label: built.queryLabel };
 }
 
 function placeLine(p: MapPlace): string {
@@ -381,8 +381,6 @@ export function PlaceFinderMap({ uid, defaultZip, defaultArea, onFlash, onPlaceR
               className="btn btn-ghost btn-block"
               style={{ textDecoration: "none" }}
               href={navLinks(selected).apple}
-              target="_blank"
-              rel="noopener noreferrer"
             >
               🍎 Apple Maps
             </a>
