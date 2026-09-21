@@ -220,9 +220,9 @@ function AuthScreen({ onFlash }: { onFlash: (m: string) => void }) {
   return (
     <div className="pad">
       <div className="hero-card" style={{ marginTop: 8 }}>
-        <div style={{ fontFamily: "var(--fd)", fontWeight: 800, fontSize: "1.5rem" }}>Fidget trading, toys &amp; playdates.</div>
+        <div style={{ fontFamily: "var(--fd)", fontWeight: 800, fontSize: "1.5rem" }}>Kids make real friends nearby.</div>
         <p className="small" style={{ opacity: .95, margin: "8px 0 0" }}>
-          Trade fidgets and other toys, then hang out at supervised playdates with families nearby. Parents stay in charge — kids swap, play, and make friends.
+          Either parent can host a playdate or help another family. Toy swaps and hangouts with kids who live close.
         </p>
       </div>
 
