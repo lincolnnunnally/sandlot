@@ -3,9 +3,9 @@ import "./globals.css";
 import { Telemetry } from '../lib/TelemetryProvider';
 
 export const metadata: Metadata = {
-  title: "Sandlot — fidget trading, toys & playdates",
+  title: "Sandlot — kids make real friends nearby",
   description:
-    "Trade fidgets and other toys, and set up supervised playdates with other families. Free parent-run swaps and meetups. A United Under God app.",
+    "Kids make real friends nearby. Either parent can host a playdate or help. Toy swaps and hangouts with families close to home.",
 };
 
 export const viewport: Viewport = {
