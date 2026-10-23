@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/terms" },
   title: "Terms of Service — Sandlot",
   description:
     "The simple rules that keep Sandlot safe: parents are in charge, meetups are supervised and in person, and safety comes first.",

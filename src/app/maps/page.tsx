@@ -11,7 +11,7 @@ export default function ParksMapPage() {
       </div>
       <div className="pad">
         <div className="section-head">
-          <h2>Find a park</h2>
+          <h1 style={{ fontSize: "1.4rem", margin: 0 }}>Find a park</h1>
           <p>Public parks — tap a result for Google Maps or Apple Maps. No venue signup.</p>
         </div>
         <div className="card">
