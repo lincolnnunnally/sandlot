@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/privacy" },
   title: "Privacy Policy — Sandlot",
   description:
     "How Sandlot handles families' information, and our COPPA promises about children's data. We collect the bare minimum and never sell it.",
