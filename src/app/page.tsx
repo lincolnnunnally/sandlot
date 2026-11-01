@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { HomeApp } from "@/components/HomeApp";
+import { HomeAbout, HomeHero } from "@/components/HomeIntro";
 import { JsonLd } from "@/components/JsonLd";
 import { SITE_URL, pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata({
-  title: "Sandlot — kids make real friends nearby",
+  title: "Sandlot — kids make real friends nearby | Playdates and toy swaps",
   description:
     "Kids make real friends nearby. Either parent can host a playdate or help. Toy swaps and hangouts with families close to home.",
   path: "/",
@@ -25,7 +26,7 @@ export default function Home() {
           publisher: { "@id": `${SITE_URL}/#org` },
         }}
       />
-      <HomeApp />
+      <HomeApp hero={<HomeHero />} about={<HomeAbout />} />
     </>
   );
 }
