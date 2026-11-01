@@ -141,6 +141,11 @@ input, select, textarea { font-family: inherit; }
 
 .hero-card { border-radius: var(--r-lg); color: #fff; padding: 18px; box-shadow: var(--shadow);
   background: linear-gradient(155deg, var(--clover), var(--clover-deep) 88%); }
+.home-about { margin-top: 16px; }
+.home-about h2 { font-size: 1.1rem; margin: 0 0 8px; }
+.home-about p { margin: 0 0 10px; font-size: .9rem; line-height: 1.55; }
+.home-about ol, .home-about ul { margin: 0; padding-left: 20px; font-size: .9rem; }
+.home-about li { margin: 0 0 7px; line-height: 1.5; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
 .kidrow { display: flex; align-items: center; gap: 10px; background: var(--paper); border: 1px solid var(--line);

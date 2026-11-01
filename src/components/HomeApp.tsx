@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { getSupabase } from "@/lib/supabase";
 import {
   addChild, addListing, blockParent, fetchAgeBands, fetchBlocks, fetchChildren,
@@ -33,7 +33,8 @@ function fmtTime(iso: string) {
   catch { return ""; }
 }
 
-export function HomeApp() {
+/** `hero` and `about` are server-rendered public copy, shown until a parent is signed in. */
+export function HomeApp({ hero, about }: { hero?: ReactNode; about?: ReactNode } = {}) {
   const supa = getSupabase();
   const [ready, setReady] = useState(false);
   const [uid, setUid] = useState<string | null>(null);
@@ -80,7 +81,8 @@ export function HomeApp() {
     return (
       <Shell>
         <div className="pad">
-          <p className="note note-sun small" style={{ marginTop: 0 }}>
+          {hero}
+          <p className="note note-sun small">
             Family accounts need a database connection. Public parks below still load.
           </p>
           <div className="section-head">
@@ -90,11 +92,12 @@ export function HomeApp() {
           <div className="card">
             <PublicParkFinder onFlash={flash} />
           </div>
+          {about}
         </div>
       </Shell>
     );
   }
-  if (!ready) return <Shell><div className="pad muted">Loading…</div></Shell>;
+  if (!ready) return <Shell><div className="pad">{hero}<p className="muted">Loading…</p>{about}</div></Shell>;
 
   const inPortal = !!(uid && parent);
 
@@ -106,7 +109,7 @@ export function HomeApp() {
         </a>
       )}
       {!uid ? (
-        <AuthScreen onFlash={flash} />
+        <AuthScreen onFlash={flash} hero={hero} about={about} />
       ) : !parentLoaded ? (
         <div className="pad muted">Loading…</div>
       ) : parentError && !parent ? (
@@ -156,7 +159,7 @@ function Shell({ children, signedIn, admin, onSignOut, parentNav }: {
 }
 
 /* ----------------------------------- AUTH ---------------------------------- */
-function AuthScreen({ onFlash }: { onFlash: (m: string) => void }) {
+function AuthScreen({ onFlash, hero, about }: { onFlash: (m: string) => void; hero?: ReactNode; about?: ReactNode }) {
   const supa = getSupabase()!;
   const [mode, setMode] = useState<"up" | "in">("up");
   const [email, setEmail] = useState("");
@@ -223,14 +226,9 @@ function AuthScreen({ onFlash }: { onFlash: (m: string) => void }) {
 
   return (
     <div className="pad">
-      <div className="hero-card" style={{ marginTop: 8 }}>
-        <h1 style={{ fontFamily: "var(--fd)", fontWeight: 800, fontSize: "1.5rem", margin: 0 }}>Kids make real friends nearby.</h1>
-        <p className="small" style={{ opacity: .95, margin: "8px 0 0" }}>
-          Either parent can host a playdate or help another family. Toy swaps and hangouts with kids who live close.
-        </p>
-      </div>
+      {hero}
 
-      <div className="eyebrow">{forgot ? "Reset your password" : mode === "up" ? "Create your parent account" : "Welcome back"}</div>
+      <div className="eyebrow" id="signup">{forgot ? "Reset your password" : mode === "up" ? "Create your parent account" : "Welcome back"}</div>
       <div className="card">
         {forgot ? (
           resetSent ? (
@@ -282,6 +280,8 @@ function AuthScreen({ onFlash }: { onFlash: (m: string) => void }) {
           </>
         )}
       </div>
+
+      {about}
 
       <div className="eyebrow first" style={{ marginTop: 16 }}>Find a park</div>
       <div className="card">
